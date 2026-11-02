@@ -1,14 +1,36 @@
 /**
  * DFA minimization via partition refinement (Moore's algorithm), producing a
- * step-by-step trace of the partitions so the UI can animate the refinement.
+ * step-by-step trace of the partitions and detailed mathematical explanations.
  */
-import type { Automaton, AutoState } from './automata'
+import {
+  type Automaton,
+  type AutoState,
+  findReachableStates,
+  completeDfaWithSink,
+  syncEdgesFromDelta,
+} from './automata'
 
 export interface PartitionStep {
   /** human-readable description of what happened */
   note: string
   /** the current partition: groups of state ids */
   groups: string[][]
+}
+
+export interface MergeRationale {
+  minimizedState: string
+  originalStates: string[]
+  reason: string
+}
+
+export interface MinimizeResult {
+  steps: PartitionStep[]
+  minimized: Automaton
+  originalStateCount: number
+  reachableStateCount: number
+  minimizedStateCount: number
+  unreachableStatesRemoved: string[]
+  mergeRationales: MergeRationale[]
 }
 
 /** first transition target of a state on a symbol (DFAs are deterministic) */
@@ -21,10 +43,42 @@ function groupOf(partition: string[][], state: string): number {
   return partition.findIndex((g) => g.includes(state))
 }
 
-export function minimizeDfa(dfa: Automaton): {
-  steps: PartitionStep[]
-  minimized: Automaton
-} {
+export function minimizeDfa(originalDfa: Automaton): MinimizeResult {
+  const steps: PartitionStep[] = []
+  const originalStateCount = originalDfa.states.length
+
+  // Step 1: Remove unreachable states
+  const reachable = findReachableStates(originalDfa)
+  const unreachableStatesRemoved = originalDfa.states
+    .filter((s) => !reachable.has(s.id))
+    .map((s) => s.id)
+
+  let dfa = originalDfa
+  if (unreachableStatesRemoved.length > 0) {
+    const reachableStates = dfa.states.filter((s) => reachable.has(s.id))
+    const reachableDelta: Record<string, Record<string, string[]>> = {}
+    for (const s of reachableStates) {
+      reachableDelta[s.id] = {}
+      for (const [sym, targets] of Object.entries(dfa.delta[s.id] ?? {})) {
+        reachableDelta[s.id][sym] = targets.filter((t) => reachable.has(t))
+      }
+    }
+    dfa = {
+      ...dfa,
+      states: reachableStates,
+      delta: reachableDelta,
+      edges: syncEdgesFromDelta(reachableStates, reachableDelta),
+    }
+    steps.push({
+      note: `Pre-processing: Removed ${unreachableStatesRemoved.length} unreachable state(s): {${unreachableStatesRemoved.join(', ')}}.`,
+      groups: [dfa.states.map((s) => s.id)],
+    })
+  }
+
+  // Ensure DFA is complete over its alphabet (add sink if missing transitions)
+  dfa = completeDfaWithSink(dfa)
+  const reachableStateCount = dfa.states.length
+
   const accepting = new Set(
     dfa.states.filter((s) => s.accept).map((s) => s.id),
   )
@@ -32,19 +86,32 @@ export function minimizeDfa(dfa: Automaton): {
   const reject = dfa.states.filter((s) => !accepting.has(s.id)).map((s) => s.id)
 
   let partition: string[][] = [reject, accept].filter((g) => g.length > 0)
-  const steps: PartitionStep[] = [
-    {
-      note: 'Start by splitting states into accepting and non-accepting groups.',
-      groups: partition.map((g) => [...g]),
-    },
-  ]
+  steps.push({
+    note:
+      partition.length === 2
+        ? 'Initial partition P0: Split states into Non-accepting { ' +
+          reject.join(', ') +
+          ' } and Accepting { ' +
+          accept.join(', ') +
+          ' }.'
+        : 'Initial partition P0: All states belong to the same acceptance class.',
+    groups: partition.map((g) => [...g]),
+  })
 
   let changed = true
+  let iteration = 1
+
   while (changed) {
     changed = false
     const next: string[][] = []
+    const splitNotes: string[] = []
 
     for (const group of partition) {
+      if (group.length <= 1) {
+        next.push(group)
+        continue
+      }
+
       // signature: for each state, which group does each symbol lead to?
       const buckets = new Map<string, string[]>()
       for (const state of group) {
@@ -61,7 +128,13 @@ export function minimizeDfa(dfa: Automaton): {
 
       if (buckets.size > 1) {
         changed = true
-        for (const list of buckets.values()) next.push(list)
+        const subGroups = Array.from(buckets.values())
+        for (const list of subGroups) next.push(list)
+        splitNotes.push(
+          `Group {${group.join(', ')}} splits into ${subGroups
+            .map((sg) => `{${sg.join(', ')}}`)
+            .join(' and ')} due to differing transition destinations.`,
+        )
       } else {
         next.push(group)
       }
@@ -70,65 +143,90 @@ export function minimizeDfa(dfa: Automaton): {
     if (changed) {
       partition = next
       steps.push({
-        note: 'Split any group whose states jump to different groups on some symbol.',
+        note: `Refinement step P${iteration}: ${splitNotes.join(' ')}`,
         groups: partition.map((g) => [...g]),
       })
+      iteration++
     }
   }
 
   steps.push({
-    note: 'No group can be split further — each group becomes one state of the minimal DFA.',
+    note: `Fixpoint reached at P${iteration}: No group can be partitioned further. The minimized DFA has ${partition.length} state(s).`,
     groups: partition.map((g) => [...g]),
   })
 
-  // Build the minimized automaton, one state per group.
+  // Build the minimized automaton, one state per partition group
   const startGroup = groupOf(partition, dfa.start)
-  const name = (idx: number) => `q${idx}`
+  const name = (idx: number) => (partition.length <= 8 ? `q${idx}` : `G${idx}`)
+
   const states: AutoState[] = partition.map((group, idx) => {
     const angle = (idx / partition.length) * Math.PI * 2 - Math.PI / 2
+    const radiusX = Math.min(260, 140 + partition.length * 15)
+    const radiusY = Math.min(180, 100 + partition.length * 10)
     return {
       id: name(idx),
-      x: 320 + Math.cos(angle) * 170,
-      y: 200 + Math.sin(angle) * 130,
+      x: 320 + Math.cos(angle) * radiusX,
+      y: 200 + Math.sin(angle) * radiusY,
       accept: group.some((s) => accepting.has(s)),
     }
   })
 
   const delta: Record<string, Record<string, string[]>> = {}
   const edgeMap = new Map<string, Set<string>>()
+  const mergeRationales: MergeRationale[] = []
+
   partition.forEach((group, idx) => {
-    delta[name(idx)] = {}
+    const stateName = name(idx)
+    delta[stateName] = {}
     const rep = group[0]
+
     for (const sym of dfa.alphabet) {
       const t = step(dfa, rep, sym)
       if (t === undefined) continue
-      const target = name(groupOf(partition, t))
-      delta[name(idx)][sym] = [target]
-      const key = `${name(idx)}->${target}`
+      const targetGroup = groupOf(partition, t)
+      const targetName = name(targetGroup)
+      delta[stateName][sym] = [targetName]
+
+      const key = `${stateName}->${targetName}`
       const syms = edgeMap.get(key) ?? new Set<string>()
       syms.add(sym)
       edgeMap.set(key, syms)
     }
+
+    mergeRationales.push({
+      minimizedState: stateName,
+      originalStates: group,
+      reason:
+        group.length > 1
+          ? `Original states {${group.join(', ')}} are indistinguishable under all possible input strings and merge into state ${stateName}.`
+          : `State ${group[0]} is unique in its equivalence class and maps to ${stateName}.`,
+    })
   })
 
-  const edges = [...edgeMap.entries()].map(([key, syms]) => {
-    const [from, to] = key.split('->')
-    return { from, to, label: [...syms].join(',') }
-  })
+  const edges = syncEdgesFromDelta(states, delta)
 
   const minimized: Automaton = {
-    id: `${dfa.id}-min`,
-    name: `${dfa.name} (minimized)`,
-    description: dfa.description,
-    language: dfa.language,
-    alphabet: dfa.alphabet,
+    id: `${originalDfa.id}-min`,
+    name: `${originalDfa.name} (minimized)`,
+    description: `Minimal DFA for ${originalDfa.name} with ${states.length} states.`,
+    language: originalDfa.language,
+    alphabet: originalDfa.alphabet,
     start: name(startGroup),
     states,
     edges,
     delta,
+    nondeterministic: false,
   }
 
-  return { steps, minimized }
+  return {
+    steps,
+    minimized,
+    originalStateCount,
+    reachableStateCount,
+    minimizedStateCount: states.length,
+    unreachableStatesRemoved,
+    mergeRationales,
+  }
 }
 
 /* ------------------------------ example DFAs ------------------------------- */

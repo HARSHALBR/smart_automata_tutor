@@ -10,6 +10,7 @@ import {
   Flame,
   FlaskConical,
   Menu,
+  Sparkles,
   X,
 } from 'lucide-react'
 import {
@@ -190,7 +191,16 @@ export function LearnWorkspace({ initialTopic }: { initialTopic?: string }) {
               <Flame className="size-3.5" /> {streak}
             </span>
           )}
-          <AboutDialog className={streak > 0 ? '' : 'ml-auto'} />
+          <Link
+            href="/solve"
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 font-mono text-xs font-medium text-primary transition-colors hover:bg-primary/20',
+              streak > 0 ? '' : 'ml-auto',
+            )}
+          >
+            <Sparkles className="size-3" /> Solver
+          </Link>
+          <AboutDialog />
         </header>
 
         <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-10 lg:px-8 lg:py-14">

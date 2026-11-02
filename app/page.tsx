@@ -59,6 +59,12 @@ export default function HomePage() {
         <div className="flex items-center gap-2">
           <AboutDialog />
           <Link
+            href="/solve"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-secondary/50 px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+          >
+            <Sparkles className="size-3.5 text-primary" /> DFA/NFA Solver
+          </Link>
+          <Link
             href="/learn"
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80"
           >
@@ -89,6 +95,12 @@ export default function HomePage() {
               className="glow-primary inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 font-medium text-primary-foreground transition-transform hover:scale-[1.02]"
             >
               Begin the course <ArrowRight className="size-4" />
+            </Link>
+            <Link
+              href="/solve"
+              className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-5 py-3 font-medium text-primary transition-colors hover:bg-primary/20"
+            >
+              <Sparkles className="size-4" /> DFA/NFA Solver
             </Link>
             <Link
               href="/learn?topic=tm-lab"
