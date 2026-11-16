@@ -30,6 +30,7 @@ import {
   formatCfgFormalTuple,
   deriveLeftmost,
   deriveRightmost,
+  findAllParseTrees,
   GRAMMARS,
 } from '@/lib/cfg'
 import {
@@ -44,14 +45,22 @@ import { ParseTreeVisualizer } from './parse-tree-visualizer'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-export function CfgSolverUI({ initialGrammarText }: { initialGrammarText?: string }) {
+export function CfgSolverUI({
+  initialGrammarText,
+  initialTargetString,
+  initialTab,
+}: {
+  initialGrammarText?: string
+  initialTargetString?: string
+  initialTab?: 'editor' | 'derivation' | 'cnf' | 'cyk' | 'ambiguity'
+}) {
   // Preset or live grammar
   const [selectedPresetId, setSelectedPresetId] = useState<string>(GRAMMARS[0].id || 'anbn')
   const [grammarText, setGrammarText] = useState<string>(
     initialGrammarText || formatCfgToText(GRAMMARS[0]),
   )
   const [activeTab, setActiveTab] = useState<'editor' | 'derivation' | 'cnf' | 'cyk' | 'ambiguity'>(
-    'derivation',
+    initialTab || 'derivation',
   )
 
   // Parse live grammar
@@ -64,10 +73,46 @@ export function CfgSolverUI({ initialGrammarText }: { initialGrammarText?: strin
   }, [parseResult])
 
   // Derivation state
-  const [targetString, setTargetString] = useState<string>('0011')
+  const initialDefaultEg =
+    initialTargetString ||
+    currentGrammar.examples[0] ||
+    (currentGrammar.terminals.includes('0') ? '0011' : currentGrammar.terminals.slice(0, 2).join('')) ||
+    '0011'
+
+  const [targetString, setTargetString] = useState<string>(initialDefaultEg)
   const [derivationMode, setDerivationMode] = useState<'leftmost' | 'rightmost'>('leftmost')
   const [derivationStepIdx, setDerivationStepIdx] = useState<number>(0)
   const [copiedText, setCopiedText] = useState<string | null>(null)
+
+  // CNF test string state
+  const [cnfTestString, setCnfTestString] = useState<string>(initialDefaultEg)
+
+  // CYK state
+  const [cykInput, setCykInput] = useState<string>(initialDefaultEg)
+  const [selectedCellCoords, setSelectedCellCoords] = useState<{ span: number; i: number } | null>(
+    null,
+  )
+
+  // Sync when initial props change
+  useEffect(() => {
+    if (initialGrammarText) {
+      setGrammarText(initialGrammarText)
+      const parsed = parseCfgFromText(initialGrammarText)
+      if (parsed.success && parsed.grammar) {
+        const defaultEg =
+          initialTargetString ||
+          parsed.grammar.examples[0] ||
+          (parsed.grammar.terminals.includes('0') ? '0011' : parsed.grammar.terminals.slice(0, 2).join('')) ||
+          '0011'
+        setTargetString(defaultEg)
+        setCykInput(defaultEg)
+        setCnfTestString(defaultEg)
+      }
+    }
+    if (initialTab) {
+      setActiveTab(initialTab)
+    }
+  }, [initialGrammarText, initialTargetString, initialTab])
 
   // Compute derivations
   const leftmostResult = useMemo(
@@ -98,17 +143,21 @@ export function CfgSolverUI({ initialGrammarText }: { initialGrammarText?: strin
     [currentGrammar],
   )
 
+  // CNF Parse Tree
+  const cnfParseTree = useMemo(() => {
+    if (!cnfResult.finalCnfGrammar) return null
+    const trees = findAllParseTrees(cnfResult.finalCnfGrammar, cnfTestString, 1)
+    if (trees.length > 0) return trees[0]
+    const cyk = runCykDetailed(cnfResult.finalCnfGrammar, cnfTestString)
+    return cyk.accepted ? cyk.reconstructedTree || null : null
+  }, [cnfResult.finalCnfGrammar, cnfTestString])
+
   // Simplification result
   const simplificationResult: CfgSimplificationResult = useMemo(
     () => simplifyCfg(currentGrammar),
     [currentGrammar],
   )
 
-  // CYK state
-  const [cykInput, setCykInput] = useState<string>('0011')
-  const [selectedCellCoords, setSelectedCellCoords] = useState<{ span: number; i: number } | null>(
-    null,
-  )
   const cykResult: CykDetailedResult = useMemo(
     () => runCykDetailed(currentGrammar, cykInput),
     [currentGrammar, cykInput],
@@ -129,9 +178,13 @@ export function CfgSolverUI({ initialGrammarText }: { initialGrammarText?: strin
     if (preset) {
       const text = formatCfgToText(preset)
       setGrammarText(text)
-      const firstEg = preset.examples[0] || '01'
+      const firstEg =
+        preset.examples[0] ||
+        (preset.terminals.includes('0') ? '0011' : preset.terminals.slice(0, 2).join('')) ||
+        '01'
       setTargetString(firstEg)
       setCykInput(firstEg)
+      setCnfTestString(firstEg)
       setAmbiguityInput('')
       setAmbiguityResult(null)
     }
@@ -427,6 +480,21 @@ export function CfgSolverUI({ initialGrammarText }: { initialGrammarText?: strin
                 <p className="mt-1 text-xs text-muted-foreground max-w-sm">
                   The target string &quot;{targetString}&quot; is not accepted by the current grammar, or the grammar is incomplete.
                 </p>
+                {currentGrammar.examples.length > 0 && (
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+                    <span className="font-mono text-xs text-muted-foreground">Try a valid example:</span>
+                    {currentGrammar.examples.map((ex, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setTargetString(ex)}
+                        className="rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-xs font-semibold text-primary hover:bg-primary/20 cursor-pointer"
+                      >
+                        {ex === '' ? 'ε' : ex}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -628,6 +696,66 @@ export function CfgSolverUI({ initialGrammarText }: { initialGrammarText?: strin
               </div>
             </div>
           )}
+
+          {/* CNF Parse Tree Visualizer */}
+          <div className="rounded-2xl border border-border bg-card/60 p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="font-mono text-sm font-bold text-foreground">
+                  Chomsky Normal Form (CNF) Binary Parse Tree Explorer
+                </h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Verify how the normalized CNF grammar constructs strictly binary parse trees for valid strings.
+                </p>
+              </div>
+            </div>
+
+            {/* Test string input */}
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={cnfTestString}
+                onChange={(e) => setCnfTestString(e.target.value)}
+                placeholder="Enter string to test on CNF grammar..."
+                className="flex-1 min-w-[200px] rounded-xl border border-border bg-background px-3 py-2 font-mono text-xs text-foreground focus:border-primary focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setCnfTestString('')}
+                className="rounded-xl border border-border bg-secondary/50 px-3 py-2 font-mono text-xs font-medium text-foreground hover:bg-secondary cursor-pointer"
+              >
+                ε
+              </button>
+              {currentGrammar.examples.map((ex, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setCnfTestString(ex)}
+                  className="rounded-lg border border-border bg-secondary/40 px-2.5 py-1.5 font-mono text-xs text-muted-foreground hover:bg-secondary hover:text-foreground cursor-pointer"
+                >
+                  {ex === '' ? 'ε' : ex}
+                </button>
+              ))}
+            </div>
+
+            {/* Parse Tree Graph */}
+            {cnfParseTree ? (
+              <ParseTreeVisualizer
+                tree={cnfParseTree}
+                title={`CNF Binary Parse Tree for "${cnfTestString === '' ? 'ε' : cnfTestString}"`}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
+                <AlertTriangle className="size-6 text-amber-500 mb-1.5" />
+                <span className="font-mono text-xs font-semibold text-foreground">
+                  String &quot;{cnfTestString}&quot; is not accepted by the CNF grammar.
+                </span>
+                <span className="text-[11px] text-muted-foreground mt-0.5">
+                  Select or enter a valid string from the examples above to visualize its binary parse tree.
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -778,6 +906,35 @@ export function CfgSolverUI({ initialGrammarText }: { initialGrammarText?: strin
           ) : (
             <div className="rounded-2xl border border-border bg-card/60 p-6 text-center text-xs font-mono text-muted-foreground">
               {cykResult.stepExplanations[0]}
+            </div>
+          )}
+
+          {/* CYK Reconstructed Parse Tree Graph */}
+          {cykResult.accepted && cykResult.reconstructedTree ? (
+            <div className="rounded-2xl border border-border bg-card/60 p-5 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-mono text-sm font-bold text-foreground">
+                    CYK Dynamic Programming Reconstructed Parse Tree
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Binary parse tree extracted by tracing dynamic programming backpointers from the top cell.
+                  </p>
+                </div>
+                <span className="rounded-full bg-emerald-500/10 px-3 py-1 font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  Accepted via CYK
+                </span>
+              </div>
+              <ParseTreeVisualizer
+                tree={cykResult.reconstructedTree}
+                title={`CYK Binary Parse Tree for "${cykInput === '' ? 'ε' : cykInput}"`}
+              />
+            </div>
+          ) : cykResult.accepted ? null : (
+            <div className="rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center">
+              <span className="font-mono text-xs font-semibold text-muted-foreground">
+                No parse tree available — string &quot;{cykInput}&quot; is not in L(G).
+              </span>
             </div>
           )}
         </div>

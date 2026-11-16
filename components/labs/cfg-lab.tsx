@@ -39,8 +39,9 @@ function layout(tree: ParseNode): { root: Laid; width: number; depth: number } {
 
 function TreeSvg({ tree }: { tree: ParseNode }) {
   const { root, width, depth } = useMemo(() => layout(tree), [tree])
-  const height = (depth + 1) * 64 + 20
-  const w = Math.max(width, 160)
+  const height = (depth + 1) * 64 + 30
+  const w = Math.max(width, 180)
+  const minX = width < 180 ? -(180 - width) / 2 : 0
 
   const edges: { x1: number; y1: number; x2: number; y2: number }[] = []
   const nodes: Laid[] = []
@@ -56,7 +57,7 @@ function TreeSvg({ tree }: { tree: ParseNode }) {
   return (
     <PinchZoom className="h-full max-h-[300px] w-full">
     <svg
-      viewBox={`0 0 ${w} ${height}`}
+      viewBox={`${minX} 0 ${w} ${height}`}
       className="h-full max-h-[300px] w-full"
       preserveAspectRatio="xMidYMin meet"
     >
@@ -73,6 +74,7 @@ function TreeSvg({ tree }: { tree: ParseNode }) {
       ))}
       {nodes.map((n, i) => {
         const isLeaf = n.children.length === 0
+        const isEps = n.symbol === '' || n.symbol === 'ε'
         return (
           <g key={i}>
             <circle
@@ -80,7 +82,9 @@ function TreeSvg({ tree }: { tree: ParseNode }) {
               cy={n.y}
               r={15}
               className={cn(
-                isLeaf
+                isEps
+                  ? 'fill-amber-500/15 stroke-amber-500 stroke-dashed'
+                  : isLeaf
                   ? 'fill-accent/15 stroke-accent'
                   : 'fill-primary/15 stroke-primary',
               )}
@@ -92,10 +96,10 @@ function TreeSvg({ tree }: { tree: ParseNode }) {
               textAnchor="middle"
               className={cn(
                 'font-mono text-xs',
-                isLeaf ? 'fill-accent' : 'fill-primary',
+                isEps ? 'fill-amber-500 italic' : isLeaf ? 'fill-accent' : 'fill-primary',
               )}
             >
-              {n.symbol}
+              {isEps ? 'ε' : n.symbol}
             </text>
           </g>
         )

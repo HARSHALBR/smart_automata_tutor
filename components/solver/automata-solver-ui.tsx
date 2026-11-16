@@ -143,6 +143,8 @@ const REGEX_PRESETS = [
 export function AutomataSolverUI() {
   const [solverMode, setSolverMode] = useState<'nl' | 'regex' | 'editor' | 'image' | 'cfg' | 'pda' | 'tm' | 'pumping_myhill'>('nl')
   const [cfgInitialText, setCfgInitialText] = useState<string | undefined>(undefined)
+  const [cfgInitialTargetString, setCfgInitialTargetString] = useState<string | undefined>(undefined)
+  const [cfgInitialTab, setCfgInitialTab] = useState<'editor' | 'derivation' | 'cnf' | 'cyk' | 'ambiguity' | undefined>(undefined)
   const [pdaInitialText, setPdaInitialText] = useState<string | undefined>(undefined)
   const [tmInitialText, setTmInitialText] = useState<string | undefined>(undefined)
   const [pumpingMyhillInitialPattern, setPumpingMyhillInitialPattern] = useState<NonRegularPattern | undefined>(undefined)
@@ -209,6 +211,27 @@ export function AutomataSolverUI() {
     if (parseResult.targetDomain === 'cfg' && parseResult.cfgProblemSpec) {
       const cfgSol = solveCfgProblem(textToSolve, parseResult.cfgProblemSpec)
       setCfgInitialText(formatCfgToText(cfgSol.formalGrammar))
+
+      let tab: 'editor' | 'derivation' | 'cnf' | 'cyk' | 'ambiguity' = 'derivation'
+      if (
+        parseResult.cfgProblemSpec.type === 'cfg_cnf_conversion' ||
+        parseResult.cfgProblemSpec.type === 'cfg_simplification'
+      ) {
+        tab = 'cnf'
+      } else if (parseResult.cfgProblemSpec.type === 'cfg_cyk_parsing') {
+        tab = 'cyk'
+      } else if (parseResult.cfgProblemSpec.type === 'cfg_ambiguity_analysis') {
+        tab = 'ambiguity'
+      }
+      setCfgInitialTab(tab)
+
+      const targetStr =
+        parseResult.cfgProblemSpec.targetString ||
+        cfgSol.formalGrammar.examples[0] ||
+        (cfgSol.formalGrammar.terminals.includes('0') ? '0011' : cfgSol.formalGrammar.terminals.slice(0, 2).join('')) ||
+        '0011'
+      setCfgInitialTargetString(targetStr)
+
       setSolverMode('cfg')
       setSolution(null)
       return
@@ -794,7 +817,13 @@ export function AutomataSolverUI() {
       {solverMode === 'image' && <ImageSolverUI />}
 
       {/* Context-Free Grammar (CFG) Solver Studio */}
-      {solverMode === 'cfg' && <CfgSolverUI initialGrammarText={cfgInitialText} />}
+      {solverMode === 'cfg' && (
+        <CfgSolverUI
+          initialGrammarText={cfgInitialText}
+          initialTargetString={cfgInitialTargetString}
+          initialTab={cfgInitialTab}
+        />
+      )}
 
       {/* Pushdown Automata (PDA) Solver Studio */}
       {solverMode === 'pda' && <PdaSolverUI initialPdaText={pdaInitialText} />}

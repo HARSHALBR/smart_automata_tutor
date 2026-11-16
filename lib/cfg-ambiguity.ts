@@ -148,7 +148,40 @@ export function analyzeAmbiguity(
     }
   }
 
-  // Case B: Bounded search across strings in Σ*
+  // Case B: First inspect candidate examples if present on the grammar
+  for (const ex of grammar.examples || []) {
+    if (!ex) continue
+    const trees = findAllParseTrees(grammar, ex, 2)
+    if (trees.length >= 2) {
+      const d1 = treeToLeftmostDerivation(trees[0], grammar.start)
+      const d2 = treeToLeftmostDerivation(trees[1], grammar.start)
+      const divIdx = findDivergenceStep(d1, d2)
+
+      const witness: AmbiguityWitness = {
+        string: ex,
+        tree1: trees[0],
+        tree2: trees[1],
+        derivation1: d1,
+        derivation2: d2,
+        divergenceStepIndex: divIdx,
+      }
+
+      return {
+        isAmbiguous: true,
+        evaluatedString: ex,
+        witness,
+        testedStringsCount: 1,
+        maxTestedLength: ex.length,
+        inconclusive: false,
+        explanation:
+          `Ambiguity Proven! String "${ex}" produces at least two structurally distinct parse trees ` +
+          `(and corresponding distinct leftmost derivations). The derivations diverge at step ${divIdx + 1}.`,
+        undecidabilityDisclaimer: UNDECIDABILITY_DISCLAIMER,
+      }
+    }
+  }
+
+  // Case C: Bounded search across strings in Σ*
   let testedCount = 0
   const candidateTerms = grammar.terminals.length > 0 ? grammar.terminals : ['0', '1']
 

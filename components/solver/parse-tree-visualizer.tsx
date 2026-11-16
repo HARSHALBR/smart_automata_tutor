@@ -26,13 +26,31 @@ interface TreeLayoutData {
  * Computes a non-overlapping hierarchical layout for arbitrary ParseNode trees.
  */
 function computeTreeLayout(tree: ParseNode): TreeLayoutData {
+  if (!tree || !tree.symbol) {
+    const fallbackNode: LayoutNode = {
+      id: 'node_fallback',
+      symbol: '∅',
+      x: 120,
+      y: 80,
+      isLeaf: true,
+      isEpsilon: false,
+      children: [],
+    }
+    return {
+      root: fallbackNode,
+      nodes: [fallbackNode],
+      edges: [],
+      viewBox: { minX: 0, minY: 0, width: 240, height: 160 },
+    }
+  }
+
   let leafCounter = 0
   let maxDepth = 0
   let idGen = 0
 
   const NODE_RADIUS = 18
-  const X_GAP = 54
-  const Y_GAP = 68
+  const X_GAP = 58
+  const Y_GAP = 72
   const MARGIN_X = 50
   const MARGIN_Y = 40
 
@@ -95,10 +113,11 @@ function computeTreeLayout(tree: ParseNode): TreeLayoutData {
   let maxY = -Infinity
 
   for (const n of nodes) {
-    minX = Math.min(minX, n.x - NODE_RADIUS)
-    maxX = Math.max(maxX, n.x + NODE_RADIUS)
-    minY = Math.min(minY, n.y - NODE_RADIUS)
-    maxY = Math.max(maxY, n.y + NODE_RADIUS)
+    const r = Math.max(NODE_RADIUS, 10 + n.symbol.length * 4)
+    minX = Math.min(minX, n.x - r)
+    maxX = Math.max(maxX, n.x + r)
+    minY = Math.min(minY, n.y - r)
+    maxY = Math.max(maxY, n.y + r)
   }
 
   minX -= MARGIN_X
@@ -106,8 +125,19 @@ function computeTreeLayout(tree: ParseNode): TreeLayoutData {
   minY -= MARGIN_Y
   maxY += MARGIN_Y
 
-  const width = Math.max(maxX - minX, 240)
-  const height = Math.max(maxY - minY, 160)
+  let width = maxX - minX
+  if (width < 280) {
+    const pad = (280 - width) / 2
+    minX -= pad
+    width = 280
+  }
+
+  let height = maxY - minY
+  if (height < 180) {
+    const pad = (180 - height) / 2
+    minY -= pad
+    height = 180
+  }
 
   return {
     root,
@@ -242,18 +272,22 @@ export function ParseTreeVisualizer({
               textClass = 'tree-text-term'
             }
 
+            const r = Math.max(18, 10 + n.symbol.length * 4)
+            const fontSize = n.symbol.length > 3 ? 10 : n.symbol.length > 1 ? 12 : 13
+
             return (
               <g key={n.id} className="cursor-pointer transition-transform hover:scale-110">
                 <circle
                   cx={n.x}
                   cy={n.y}
-                  r={17}
+                  r={r}
                   className={circleClass}
                 />
                 <text
                   x={n.x}
                   y={n.y}
                   className={textClass}
+                  style={{ fontSize: `${fontSize}px` }}
                 >
                   {n.symbol}
                 </text>
