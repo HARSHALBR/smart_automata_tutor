@@ -22,6 +22,8 @@ import {
   BookOpen,
   Camera,
   GitBranch,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { parseQuestion, type ParsedQuestion } from '@/lib/nlp-parser'
 import {
@@ -59,50 +61,71 @@ import { ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const PRESET_QUESTIONS = [
-  'Construct a DFA over {0,1} that accepts strings ending with 01.',
-  'Construct a DFA that accepts strings containing an even number of zeros.',
-  'Construct a DFA that accepts strings with an odd number of ones.',
-  "Construct a CFG for strings with equal numbers of a's and b's.",
-  'Construct a CFG for palindromes over {0,1}.',
-  'Construct a PDA for a^n b^n.',
-  'Construct a PDA for balanced parentheses.',
-  'Construct a PDA for palindromes over {0,1}.',
-  'Construct a PDA for strings containing equal numbers of 0s and 1s.',
-  'Convert CFG to PDA.',
-  'Convert PDA to CFG.',
-  'Construct a TM that accepts a^n b^n c^n.',
-  'Construct a TM for palindromes over {0,1}.',
-  'Construct a TM that accepts strings containing equal numbers of 0s and 1s.',
-  'Construct a TM that performs unary addition.',
-  'Construct a TM for binary divisibility by 3.',
-  'Prove that {0^n1^n | n ≥ 0} is not regular.',
-  'Prove that {a^n b^n c^n | n ≥ 0} is not regular.',
-  'Prove that palindromes over {0,1} are not regular.',
-  'Prove that {ww | w ∈ {0,1}*} is not regular.',
-  'Apply Myhill–Nerode Theorem to {0^n 1^n}.',
-  'Find distinguishing suffix for strings 0 and 01.',
-  'Find the leftmost derivation of 0011.',
-  'Convert grammar into CNF.',
-  'Demonstrate ambiguity with two parse trees.',
-  'Construct a DFA that accepts strings containing the substring 101.',
-  'Construct a DFA that does not contain substring 011.',
-  'Accept strings containing at most two ones.',
-  'Construct a DFA accepting strings with exactly two ones.',
-  'Construct a DFA that accepts strings of length at most 3.',
-  'Construct a DFA where every 0 is immediately followed by 1.',
-  'Construct a DFA for decimal numbers divisible by 3.',
-  'Construct a DFA containing substring 01 at least twice.',
-  'Strings where the number of zeros is divisible by 3.',
-  'Construct a DFA accepting strings containing 00 but not 11.',
-  'Design a machine starting with 01 OR ending with 10.',
-  'Construct a DFA that accepts strings whose binary value is divisible by 3.',
-  'Construct a DFA that accepts strings beginning with 1 and ending with 0.',
-  'Construct a DFA that accepts strings containing no consecutive ones.',
-  'Construct a DFA that accepts strings whose length is divisible by 3.',
-  'Convert this NFA into an equivalent DFA.',
-  'Minimize the following DFA.',
+const CATEGORIZED_QUESTIONS: { category: string; question: string; featured?: boolean }[] = [
+  // DFA & NFA (Type 3)
+  { category: 'DFA & NFA', question: 'Construct a DFA over {0,1} that accepts strings ending with 01.', featured: true },
+  { category: 'DFA & NFA', question: 'Construct a DFA that accepts strings containing an even number of zeros.', featured: true },
+  { category: 'DFA & NFA', question: 'Construct a DFA that accepts strings with an odd number of ones.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA that accepts strings containing the substring 101.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA that does not contain substring 011.' },
+  { category: 'DFA & NFA', question: 'Accept strings containing at most two ones.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA accepting strings with exactly two ones.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA that accepts strings of length at most 3.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA where every 0 is immediately followed by 1.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA for decimal numbers divisible by 3.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA containing substring 01 at least twice.' },
+  { category: 'DFA & NFA', question: 'Strings where the number of zeros is divisible by 3.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA accepting strings containing 00 but not 11.' },
+  { category: 'DFA & NFA', question: 'Design a machine starting with 01 OR ending with 10.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA that accepts strings whose binary value is divisible by 3.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA that accepts strings beginning with 1 and ending with 0.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA that accepts strings containing no consecutive ones.' },
+  { category: 'DFA & NFA', question: 'Construct a DFA that accepts strings whose length is divisible by 3.' },
+  { category: 'DFA & NFA', question: 'Convert this NFA into an equivalent DFA.' },
+  { category: 'DFA & NFA', question: 'Minimize the following DFA.' },
+
+  // Context-Free Grammars (Type 2)
+  { category: 'CFG', question: "Construct a CFG for strings with equal numbers of a's and b's.", featured: true },
+  { category: 'CFG', question: 'Construct a CFG for palindromes over {0,1}.' },
+  { category: 'CFG', question: 'Find the leftmost derivation of 0011.' },
+  { category: 'CFG', question: 'Convert grammar into CNF.' },
+  { category: 'CFG', question: 'Demonstrate ambiguity with two parse trees.' },
+
+  // Pushdown Automata (Type 2)
+  { category: 'PDA', question: 'Construct a PDA for a^n b^n.', featured: true },
+  { category: 'PDA', question: 'Construct a PDA for balanced parentheses.' },
+  { category: 'PDA', question: 'Construct a PDA for palindromes over {0,1}.' },
+  { category: 'PDA', question: 'Construct a PDA for strings containing equal numbers of 0s and 1s.' },
+  { category: 'PDA', question: 'Convert CFG to PDA.' },
+  { category: 'PDA', question: 'Convert PDA to CFG.' },
+
+  // Turing Machines (Type 0)
+  { category: 'Turing Machine', question: 'Construct a TM that accepts a^n b^n c^n.', featured: true },
+  { category: 'Turing Machine', question: 'Construct a TM for palindromes over {0,1}.' },
+  { category: 'Turing Machine', question: 'Construct a TM that accepts strings containing equal numbers of 0s and 1s.' },
+  { category: 'Turing Machine', question: 'Construct a TM that performs unary addition.' },
+  { category: 'Turing Machine', question: 'Construct a TM for binary divisibility by 3.' },
+
+  // Pumping Lemma & Myhill-Nerode
+  { category: 'Pumping & Non-Regular', question: 'Prove that {0^n1^n | n ≥ 0} is not regular.', featured: true },
+  { category: 'Pumping & Non-Regular', question: 'Prove that {a^n b^n c^n | n ≥ 0} is not regular.' },
+  { category: 'Pumping & Non-Regular', question: 'Prove that palindromes over {0,1} are not regular.' },
+  { category: 'Pumping & Non-Regular', question: 'Prove that {ww | w ∈ {0,1}*} is not regular.' },
+  { category: 'Pumping & Non-Regular', question: 'Apply Myhill–Nerode Theorem to {0^n 1^n}.' },
+  { category: 'Pumping & Non-Regular', question: 'Find distinguishing suffix for strings 0 and 01.' },
 ]
+
+const PRESET_CATEGORIES = [
+  'All',
+  'DFA & NFA',
+  'CFG',
+  'PDA',
+  'Turing Machine',
+  'Pumping & Non-Regular',
+] as const
+
+const FEATURED_PRESETS = CATEGORIZED_QUESTIONS.filter((q) => q.featured).map((q) => q.question)
+const PRESET_QUESTIONS = CATEGORIZED_QUESTIONS.map((q) => q.question)
 
 const REGEX_PRESETS = [
   '(0|1)*01',
@@ -124,6 +147,18 @@ export function AutomataSolverUI() {
   const [tmInitialText, setTmInitialText] = useState<string | undefined>(undefined)
   const [pumpingMyhillInitialPattern, setPumpingMyhillInitialPattern] = useState<NonRegularPattern | undefined>(undefined)
   const [query, setQuery] = useState(PRESET_QUESTIONS[0])
+  const [expandedPresets, setExpandedPresets] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string>('All')
+
+  const visiblePresets = useMemo(() => {
+    if (!expandedPresets) {
+      return FEATURED_PRESETS
+    }
+    if (selectedCategory === 'All') {
+      return PRESET_QUESTIONS
+    }
+    return CATEGORIZED_QUESTIONS.filter((q) => q.category === selectedCategory).map((q) => q.question)
+  }, [expandedPresets, selectedCategory])
   const [regexInput, setRegexInput] = useState('(0|1)*01')
   const [regexAlphabet, setRegexAlphabet] = useState('0, 1')
   const [showGrammarHelp, setShowGrammarHelp] = useState(false)
@@ -564,26 +599,91 @@ export function AutomataSolverUI() {
             </div>
           </form>
 
-          {/* Quick Presets */}
-          <div className="mt-4 space-y-2">
-            <span className="font-mono text-xs text-muted-foreground">
-              Try standard exam questions:
-            </span>
+          {/* Quick Presets (Minimized & Categorized) */}
+          <div className="mt-4 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+                <span>Try standard exam questions:</span>
+                <span className="rounded-full bg-secondary/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground border border-border/40">
+                  {expandedPresets
+                    ? selectedCategory === 'All'
+                      ? `${CATEGORIZED_QUESTIONS.length} total`
+                      : `${visiblePresets.length} in ${selectedCategory}`
+                    : `${FEATURED_PRESETS.length} featured`}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setExpandedPresets(!expandedPresets)}
+                className="flex items-center gap-1 font-mono text-xs text-primary hover:underline cursor-pointer"
+              >
+                {expandedPresets ? (
+                  <>
+                    Show fewer <ChevronUp className="size-3.5" />
+                  </>
+                ) : (
+                  <>
+                    View all {CATEGORIZED_QUESTIONS.length} questions <ChevronDown className="size-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* When expanded, show category filters */}
+            {expandedPresets && (
+              <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                {PRESET_CATEGORIES.map((cat) => {
+                  const count =
+                    cat === 'All'
+                      ? CATEGORIZED_QUESTIONS.length
+                      : CATEGORIZED_QUESTIONS.filter((q) => q.category === cat).length
+                  const isCatActive = selectedCategory === cat
+                  return (
+                    <button
+                      type="button"
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={cn(
+                        'rounded-md px-2.5 py-0.5 font-mono text-[11px] transition-colors cursor-pointer',
+                        isCatActive
+                          ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                          : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground',
+                      )}
+                    >
+                      {cat} ({count})
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Questions List */}
             <div className="flex flex-wrap gap-1.5">
-              {PRESET_QUESTIONS.map((q) => (
+              {visiblePresets.map((q) => (
                 <button
+                  type="button"
                   key={q}
                   onClick={() => handleSelectPreset(q)}
                   className={cn(
-                    'rounded-lg border px-2.5 py-1 text-left font-mono text-xs transition-colors',
+                    'rounded-lg border px-2.5 py-1 text-left font-mono text-xs transition-colors cursor-pointer',
                     query === q
-                      ? 'border-primary bg-primary/10 text-primary'
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
                       : 'border-border/60 bg-secondary/30 text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
                   )}
                 >
                   {q}
                 </button>
               ))}
+
+              {!expandedPresets && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedPresets(true)}
+                  className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-2.5 py-1 font-mono text-xs text-primary hover:bg-primary/10 hover:border-primary transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  +{CATEGORIZED_QUESTIONS.length - FEATURED_PRESETS.length} more...
+                </button>
+              )}
             </div>
           </div>
         </div>
