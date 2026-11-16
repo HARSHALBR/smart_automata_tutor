@@ -129,4 +129,48 @@ describe('Phase 19 - CFG & CNF Graph Generation & Parse Tree Verification', () =
       assert(sol.ambiguityResult.witness.tree2 !== undefined)
     })
   })
+
+  describe('4. Parse Tree Structure and Geometric Invariants', () => {
+    it('generates correct hierarchy and leaf yield for "0011"', () => {
+      const g = GRAMMARS.find((gram) => gram.id === 'anbn')!
+      assert(g !== undefined)
+      const res = deriveLeftmost(g, '0011')
+      assert(res !== null && res.tree !== undefined)
+
+      const root = res.tree
+      assert.strictEqual(root.symbol, 'S')
+      assert.strictEqual(root.children?.length, 3)
+
+      const [c0, c1, c2] = root.children!
+      assert.strictEqual(c0.symbol, '0')
+      assert.strictEqual(c1.symbol, 'S')
+      assert.strictEqual(c2.symbol, '1')
+
+      // Middle S
+      assert.strictEqual(c1.children?.length, 3)
+      const [m0, m1, m2] = c1.children!
+      assert.strictEqual(m0.symbol, '0')
+      assert.strictEqual(m1.symbol, 'S')
+      assert.strictEqual(m2.symbol, '1')
+
+      // Innermost S
+      assert.strictEqual(m1.children?.length, 1)
+      assert.strictEqual(m1.children![0].symbol, 'ε')
+
+      // Collect leaves and verify yield
+      const leaves: string[] = []
+      function collectLeaves(node: typeof root) {
+        if (!node.children || node.children.length === 0) {
+          leaves.push(node.symbol)
+        } else {
+          for (const ch of node.children) collectLeaves(ch)
+        }
+      }
+      collectLeaves(root)
+
+      assert.deepStrictEqual(leaves, ['0', '0', 'ε', '1', '1'])
+      const terminalYield = leaves.filter((s) => s !== 'ε').join('')
+      assert.strictEqual(terminalYield, '0011')
+    })
+  })
 })

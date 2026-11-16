@@ -68,8 +68,10 @@ function TreeSvg({ tree }: { tree: ParseNode }) {
           y1={e.y1}
           x2={e.x2}
           y2={e.y2}
-          className="stroke-border"
-          strokeWidth={1.5}
+          stroke="#64748b"
+          strokeWidth={2}
+          strokeLinecap="round"
+          opacity={0.8}
         />
       ))}
       {nodes.map((n, i) => {

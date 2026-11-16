@@ -10,6 +10,7 @@ interface LayoutNode {
   symbol: string
   x: number
   y: number
+  r: number
   isLeaf: boolean
   isEpsilon: boolean
   children: LayoutNode[]
@@ -22,6 +23,12 @@ interface TreeLayoutData {
   viewBox: { minX: number; minY: number; width: number; height: number }
 }
 
+function getNodeRadius(symbol: string): number {
+  if (symbol.length <= 1) return 20
+  if (symbol.length === 2) return 22
+  return Math.min(36, 16 + symbol.length * 4)
+}
+
 /**
  * Computes a non-overlapping hierarchical layout for arbitrary ParseNode trees.
  */
@@ -30,8 +37,9 @@ function computeTreeLayout(tree: ParseNode): TreeLayoutData {
     const fallbackNode: LayoutNode = {
       id: 'node_fallback',
       symbol: '∅',
-      x: 120,
-      y: 80,
+      x: 140,
+      y: 90,
+      r: 20,
       isLeaf: true,
       isEpsilon: false,
       children: [],
@@ -40,7 +48,7 @@ function computeTreeLayout(tree: ParseNode): TreeLayoutData {
       root: fallbackNode,
       nodes: [fallbackNode],
       edges: [],
-      viewBox: { minX: 0, minY: 0, width: 240, height: 160 },
+      viewBox: { minX: 0, minY: 0, width: 280, height: 180 },
     }
   }
 
@@ -48,26 +56,28 @@ function computeTreeLayout(tree: ParseNode): TreeLayoutData {
   let maxDepth = 0
   let idGen = 0
 
-  const NODE_RADIUS = 18
-  const X_GAP = 58
-  const Y_GAP = 72
-  const MARGIN_X = 50
-  const MARGIN_Y = 40
+  const X_GAP = 68
+  const Y_GAP = 80
+  const MARGIN_X = 60
+  const MARGIN_Y = 50
 
   function layoutRecursive(node: ParseNode, depth: number): LayoutNode {
     maxDepth = Math.max(maxDepth, depth)
     const currentId = `node_${idGen++}`
     const isEpsilon = node.symbol === 'ε' || node.symbol === ''
     const hasKids = Boolean(node.children && node.children.length > 0)
+    const nodeSymbol = isEpsilon ? 'ε' : node.symbol
+    const r = getNodeRadius(nodeSymbol)
 
     if (!hasKids) {
       const x = leafCounter * X_GAP
       leafCounter += 1
       return {
         id: currentId,
-        symbol: isEpsilon ? 'ε' : node.symbol,
+        symbol: nodeSymbol,
         x,
         y: depth * Y_GAP,
+        r,
         isLeaf: true,
         isEpsilon,
         children: [],
@@ -75,16 +85,17 @@ function computeTreeLayout(tree: ParseNode): TreeLayoutData {
     }
 
     const childrenLayout = node.children!.map((child) => layoutRecursive(child, depth + 1))
-    // Center parent over its children
+    // Center parent symmetrically over its first and last immediate children
     const firstX = childrenLayout[0].x
     const lastX = childrenLayout[childrenLayout.length - 1].x
     const x = (firstX + lastX) / 2
 
     return {
       id: currentId,
-      symbol: node.symbol,
+      symbol: nodeSymbol,
       x,
       y: depth * Y_GAP,
+      r,
       isLeaf: false,
       isEpsilon: false,
       children: childrenLayout,
@@ -93,14 +104,28 @@ function computeTreeLayout(tree: ParseNode): TreeLayoutData {
 
   const root = layoutRecursive(tree, 0)
 
-  // Collect all nodes and edges
+  // Collect all nodes and compute edge lines trimmed precisely at node perimeters
   const nodes: LayoutNode[] = []
   const edges: { x1: number; y1: number; x2: number; y2: number }[] = []
 
   function traverse(n: LayoutNode) {
     nodes.push(n)
     for (const c of n.children) {
-      edges.push({ x1: n.x, y1: n.y, x2: c.x, y2: c.y })
+      const dx = c.x - n.x
+      const dy = c.y - n.y
+      const dist = Math.hypot(dx, dy)
+      if (dist > n.r + c.r) {
+        const uX = dx / dist
+        const uY = dy / dist
+        edges.push({
+          x1: n.x + uX * n.r,
+          y1: n.y + uY * n.r,
+          x2: c.x - uX * c.r,
+          y2: c.y - uY * c.r,
+        })
+      } else {
+        edges.push({ x1: n.x, y1: n.y, x2: c.x, y2: c.y })
+      }
       traverse(c)
     }
   }
@@ -113,11 +138,10 @@ function computeTreeLayout(tree: ParseNode): TreeLayoutData {
   let maxY = -Infinity
 
   for (const n of nodes) {
-    const r = Math.max(NODE_RADIUS, 10 + n.symbol.length * 4)
-    minX = Math.min(minX, n.x - r)
-    maxX = Math.max(maxX, n.x + r)
-    minY = Math.min(minY, n.y - r)
-    maxY = Math.max(maxY, n.y + r)
+    minX = Math.min(minX, n.x - n.r)
+    maxX = Math.max(maxX, n.x + n.r)
+    minY = Math.min(minY, n.y - n.r)
+    maxY = Math.max(maxY, n.y + n.r)
   }
 
   minX -= MARGIN_X
@@ -126,17 +150,17 @@ function computeTreeLayout(tree: ParseNode): TreeLayoutData {
   maxY += MARGIN_Y
 
   let width = maxX - minX
-  if (width < 280) {
-    const pad = (280 - width) / 2
+  if (width < 320) {
+    const pad = (320 - width) / 2
     minX -= pad
-    width = 280
+    width = 320
   }
 
   let height = maxY - minY
-  if (height < 180) {
-    const pad = (180 - height) / 2
+  if (height < 200) {
+    const pad = (200 - height) / 2
     minY -= pad
-    height = 180
+    height = 200
   }
 
   return {
@@ -180,14 +204,14 @@ export function ParseTreeVisualizer({
   }
 
   return (
-    <div className={cn('relative flex flex-col rounded-2xl border border-border bg-card/60 backdrop-blur overflow-hidden', className)}>
+    <div className={cn('relative flex flex-col rounded-2xl border border-border bg-card/60 backdrop-blur overflow-hidden shadow-lg', className)}>
       {/* Header Controls */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-secondary/30 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {title}
           </span>
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
+          <span className="rounded-full bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 font-mono text-[11px] font-bold text-sky-400">
             Root: {tree.symbol}
           </span>
         </div>
@@ -229,90 +253,145 @@ export function ParseTreeVisualizer({
       </div>
 
       {/* SVG Canvas Area */}
-      <div className="flex-1 w-full min-h-[300px] max-h-[460px] overflow-auto p-4 flex items-center justify-center">
+      <div className="flex-1 w-full min-h-[320px] max-h-[500px] overflow-auto p-4 flex items-center justify-center bg-[#090d16]">
         <svg
           ref={svgRef}
           viewBox={`${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`}
           style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
-          className="h-full w-full max-h-[420px] transition-transform duration-150 select-none"
+          className="h-full w-full max-h-[460px] transition-transform duration-150 select-none"
           preserveAspectRatio="xMidYMid meet"
         >
-          <style>{`
-            .tree-edge { stroke: hsl(var(--border)); stroke-width: 2px; }
-            .tree-node-var { fill: hsl(var(--card)); stroke: hsl(var(--primary)); stroke-width: 2px; }
-            .tree-node-term { fill: hsl(var(--card)); stroke: #10b981; stroke-width: 2px; }
-            .tree-node-eps { fill: hsl(var(--card)); stroke: #f59e0b; stroke-width: 2px; stroke-dasharray: 3 3; }
-            .tree-text-var { fill: hsl(var(--foreground)); font-family: monospace; font-weight: bold; font-size: 13px; text-anchor: middle; dominant-baseline: central; }
-            .tree-text-term { fill: #10b981; font-family: monospace; font-weight: bold; font-size: 13px; text-anchor: middle; dominant-baseline: central; }
-            .tree-text-eps { fill: #f59e0b; font-family: monospace; font-style: italic; font-size: 13px; text-anchor: middle; dominant-baseline: central; }
-          `}</style>
+          <defs>
+            {/* Subtle engineering dot grid pattern */}
+            <pattern
+              id="parse-tree-grid"
+              width="24"
+              height="24"
+              patternUnits="userSpaceOnUse"
+            >
+              <circle cx="12" cy="12" r="1" fill="#334155" opacity="0.35" />
+            </pattern>
+          </defs>
 
-          {/* Edges */}
-          {edges.map((e, idx) => (
-            <line
-              key={`edge_${idx}`}
-              x1={e.x1}
-              y1={e.y1}
-              x2={e.x2}
-              y2={e.y2}
-              className="tree-edge"
-            />
-          ))}
+          {/* Background Canvas */}
+          <rect
+            x={viewBox.minX}
+            y={viewBox.minY}
+            width={viewBox.width}
+            height={viewBox.height}
+            fill="#090d16"
+          />
+          <rect
+            x={viewBox.minX}
+            y={viewBox.minY}
+            width={viewBox.width}
+            height={viewBox.height}
+            fill="url(#parse-tree-grid)"
+          />
 
-          {/* Nodes */}
-          {nodes.map((n) => {
-            let circleClass = 'tree-node-var'
-            let textClass = 'tree-text-var'
+          {/* Tree Edges (Branches) */}
+          <g className="tree-edges">
+            {edges.map((e, idx) => (
+              <line
+                key={`edge_${idx}`}
+                x1={e.x1}
+                y1={e.y1}
+                x2={e.x2}
+                y2={e.y2}
+                stroke="#64748b"
+                strokeWidth={2}
+                strokeLinecap="round"
+                opacity={0.85}
+              />
+            ))}
+          </g>
 
-            if (n.isEpsilon) {
-              circleClass = 'tree-node-eps'
-              textClass = 'tree-text-eps'
-            } else if (n.isLeaf) {
-              circleClass = 'tree-node-term'
-              textClass = 'tree-text-term'
-            }
+          {/* Tree Nodes */}
+          <g className="tree-nodes">
+            {nodes.map((n) => {
+              const fontSize = n.symbol.length > 3 ? 10 : n.symbol.length > 1 ? 12 : 13
 
-            const r = Math.max(18, 10 + n.symbol.length * 4)
-            const fontSize = n.symbol.length > 3 ? 10 : n.symbol.length > 1 ? 12 : 13
+              // Distinct high-contrast palette
+              const fillColor = n.isEpsilon
+                ? '#241606'
+                : n.isLeaf
+                ? '#04241b'
+                : '#0b1c30'
 
-            return (
-              <g key={n.id} className="cursor-pointer transition-transform hover:scale-110">
-                <circle
-                  cx={n.x}
-                  cy={n.y}
-                  r={r}
-                  className={circleClass}
-                />
-                <text
-                  x={n.x}
-                  y={n.y}
-                  className={textClass}
-                  style={{ fontSize: `${fontSize}px` }}
+              const strokeColor = n.isEpsilon
+                ? '#f59e0b'
+                : n.isLeaf
+                ? '#10b981'
+                : '#38bdf8'
+
+              const textColor = n.isEpsilon
+                ? '#fbbf24'
+                : n.isLeaf
+                ? '#34d399'
+                : '#e0f2fe'
+
+              const strokeWidth = n.isEpsilon ? 2 : 2.5
+              const strokeDasharray = n.isEpsilon ? '4 3' : undefined
+
+              const tooltipText = n.isEpsilon
+                ? 'Empty string (ε)'
+                : n.isLeaf
+                ? `Terminal: "${n.symbol}"`
+                : `Non-Terminal Variable: ${n.symbol}`
+
+              return (
+                <g
+                  key={n.id}
+                  className="cursor-pointer transition-transform duration-150 hover:scale-110"
+                  style={{ transformOrigin: `${n.x}px ${n.y}px` }}
                 >
-                  {n.symbol}
-                </text>
-              </g>
-            )
-          })}
+                  <title>{tooltipText}</title>
+                  {/* Base Circle */}
+                  <circle
+                    cx={n.x}
+                    cy={n.y}
+                    r={n.r}
+                    fill={fillColor}
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={strokeDasharray}
+                  />
+                  {/* Centered Node Label */}
+                  <text
+                    x={n.x}
+                    y={n.y}
+                    fill={textColor}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                    fontWeight="700"
+                    style={{ fontSize: `${fontSize}px` }}
+                    className="select-none pointer-events-none"
+                  >
+                    {n.symbol}
+                  </text>
+                </g>
+              )
+            })}
+          </g>
         </svg>
       </div>
 
       {/* Legend Footer */}
-      <div className="flex flex-wrap items-center justify-center gap-4 border-t border-border bg-secondary/20 px-4 py-2 font-mono text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <span className="size-3 rounded-full border-2 border-primary bg-card" />
-          <span>Non-Terminal (Variable)</span>
+      <div className="flex flex-wrap items-center justify-center gap-6 border-t border-border bg-secondary/30 px-4 py-2.5 font-mono text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <span className="size-3.5 rounded-full border-2 border-sky-400 bg-[#0b1c30] shadow-[0_0_8px_rgba(56,189,248,0.35)]" />
+          <span className="text-foreground font-medium">Non-Terminal (Variable)</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="size-3 rounded-full border-2 border-emerald-500 bg-card" />
-          <span>Terminal Leaf</span>
+        <div className="flex items-center gap-2">
+          <span className="size-3.5 rounded-full border-2 border-emerald-500 bg-[#04241b] shadow-[0_0_8px_rgba(16,185,129,0.35)]" />
+          <span className="text-foreground font-medium">Terminal Leaf</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="size-3 rounded-full border-2 border-amber-500 border-dashed bg-card" />
-          <span>Empty String (ε)</span>
+        <div className="flex items-center gap-2">
+          <span className="size-3.5 rounded-full border-2 border-dashed border-amber-500 bg-[#241606] shadow-[0_0_8px_rgba(245,158,11,0.35)]" />
+          <span className="text-foreground font-medium">Empty String (ε)</span>
         </div>
       </div>
     </div>
   )
 }
-

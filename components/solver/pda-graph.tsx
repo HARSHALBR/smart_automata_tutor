@@ -187,7 +187,7 @@ export function PdaGraph({
               markerHeight="6"
               orient="auto-start-reverse"
             >
-              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="hsl(var(--primary))" />
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8" />
             </marker>
             <marker
               id="pda-arrow-muted"
@@ -198,7 +198,7 @@ export function PdaGraph({
               markerHeight="6"
               orient="auto-start-reverse"
             >
-              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="hsl(var(--muted-foreground))" />
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748b" />
             </marker>
           </defs>
 
@@ -210,7 +210,7 @@ export function PdaGraph({
                 y1={nodeMap.get(pda.startState)!.y}
                 x2={nodeMap.get(pda.startState)!.x - 30}
                 y2={nodeMap.get(pda.startState)!.y}
-                stroke="hsl(var(--primary))"
+                stroke="#38bdf8"
                 strokeWidth={2.5}
                 markerEnd="url(#pda-arrow)"
               />
@@ -243,7 +243,7 @@ export function PdaGraph({
                   <path
                     d={pathD}
                     fill="none"
-                    stroke="hsl(var(--primary))"
+                    stroke="#38bdf8"
                     strokeWidth={2}
                     markerEnd="url(#pda-arrow)"
                   />
@@ -253,8 +253,8 @@ export function PdaGraph({
                     width={combinedLabel.length * 7.6 + 16}
                     height={18}
                     rx={6}
-                    fill="hsl(var(--card))"
-                    stroke="hsl(var(--border))"
+                    fill="#0f172a"
+                    stroke="#334155"
                     strokeWidth={1}
                   />
                   <text
@@ -283,7 +283,7 @@ export function PdaGraph({
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke="hsl(var(--primary))"
+                    stroke="#38bdf8"
                     strokeWidth={2}
                     markerEnd="url(#pda-arrow)"
                   />
@@ -293,8 +293,8 @@ export function PdaGraph({
                     width={combinedLabel.length * 7.6 + 16}
                     height={18}
                     rx={6}
-                    fill="hsl(var(--card))"
-                    stroke="hsl(var(--border))"
+                    fill="#0f172a"
+                    stroke="#334155"
                     strokeWidth={1}
                   />
                   <text
@@ -327,7 +327,7 @@ export function PdaGraph({
                 <path
                   d={pathD}
                   fill="none"
-                  stroke="hsl(var(--primary))"
+                  stroke="#38bdf8"
                   strokeWidth={2}
                   markerEnd="url(#pda-arrow)"
                 />
@@ -337,8 +337,8 @@ export function PdaGraph({
                   width={combinedLabel.length * 7.6 + 16}
                   height={18}
                   rx={6}
-                  fill="hsl(var(--card))"
-                  stroke="hsl(var(--border))"
+                  fill="#0f172a"
+                  stroke="#334155"
                   strokeWidth={1}
                 />
                 <text
@@ -366,7 +366,7 @@ export function PdaGraph({
                     cy={n.y}
                     r={32}
                     fill="none"
-                    stroke="hsl(var(--primary))"
+                    stroke="#38bdf8"
                     strokeWidth={3}
                     strokeDasharray="4 4"
                     className="animate-spin-slow opacity-80"
@@ -393,7 +393,7 @@ export function PdaGraph({
                     cy={n.y}
                     r={21}
                     fill="none"
-                    stroke={isActive ? 'hsl(var(--primary))' : 'hsl(var(--foreground))'}
+                    stroke={isActive ? '#38bdf8' : '#f8fafc'}
                     strokeWidth={1.5}
                   />
                 )}
